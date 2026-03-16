@@ -1,0 +1,4278 @@
+    <!DOCTYPE html>
+      <html lang="en">
+      <head>
+      <meta charset="UTF-8">
+      <title>Industrial SCADA Pro - Multi Machine</title>
+
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
+      <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+
+
+      <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+
+
+      <style>
+.fault-box{
+    margin-top:10px;
+    padding:10px;
+    border-radius:12px;
+    border:1px solid #ff3b5c;
+    color:#ff3b5c;
+    font-weight:600;
+    text-align:center;
+    background:rgba(255,0,0,0.05);
+    transition:0.3s;
+}
+.status-row span:first-child{
+  margin-left:15px;
+}
+.fault-box.active{
+    background:rgba(255,0,0,0.15);
+}
+.fault-name-box{
+    margin-top:8px;
+    padding:8px 14px;
+    border-radius:14px;
+    background: rgb(29, 23, 48);
+    border:1px solid rgba(255,80,80,0.25);
+    color:#a2233c;
+    font-size:13px;
+    font-weight:500;
+    letter-spacing:0.3px;
+    display: block;
+    transition:all 0.25s ease;
+}
+
+.fault-name-box.active{
+    display:inline-block;
+    animation:fadeSlide 0.3s ease;
+}
+
+@keyframes fadeSlide{
+    from{
+        opacity:0;
+        transform:translateY(-4px);
+    }
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+
+.motor-current-card{
+  display:none;
+}
+/* ===== Machine Status Pro Style ===== */
+
+.status-panel{
+  margin-top:18px;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+
+.status-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding-bottom:10px;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+
+.status-label{
+  font-size:14px;
+  opacity:0.7;
+  letter-spacing:0.5px;
+}
+
+/* Badge base */
+.status-badge{
+  padding:6px 18px;
+  border-radius:25px;
+  font-weight:600;
+  font-size:13px;
+  text-align:center;
+  min-width:100px;
+  transition:0.3s ease;
+}
+
+/* REMOTE (แดง) */
+.status-badge.remote{
+  background: rgba(255,80,80,0.15);
+  color:#FF5A5A;
+  box-shadow:0 0 10px rgba(255,80,80,0.25);
+}
+
+/* LOCAL (เขียว) */
+.status-badge.local{
+  background: rgba(0,255,200,0.15);
+  color:#00FFC8;
+  box-shadow:0 0 10px rgba(0,255,200,0.25);
+}
+
+/* Blink effect */
+.blink{
+  animation: blinkAnim 1s infinite;
+}
+
+@keyframes blinkAnim{
+  50%{ opacity:0.4; }
+}
+/* Running / Normal */
+.status-badge.running,
+.status-badge.normal{
+  background:rgba(79,209,197,0.15);
+  color:#4fd1c5;
+}
+.status-badge.at-speed{
+  background: rgba(0,255,180,0.15);
+  color:#4fd1c5;
+  font-weight:600;
+}
+
+/* Stopped */
+.status-badge.stopped{
+  background:rgba(255,95,95,0.15);
+  color:#ff5f5f;
+}
+
+/* Fault */
+.status-badge.fault{
+  background:rgba(255,0,0,0.18);
+  color:#ff4d4d;
+  box-shadow:0 0 10px rgba(255,0,0,0.4);
+}
+.brand{
+display:flex;
+align-items:center;
+justify-content:center;
+padding:12px 0;        /* เว้นบนล่าง */
+}
+
+.brand-logo{
+width:180px;           /* ทำให้ยาวขึ้น */
+height:auto;
+border-radius:40px;
+margin:8px 0;          /* เว้นบนล่างของรูป */
+object-fit:contain;    /* ไม่ให้รูปยืด */
+}
+  .topbar {
+      height: 60px;
+      background: #111827;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+  }
+
+  .logo {
+      font-size: 18px;
+      font-weight: bold;
+      letter-spacing: 1px;
+  }
+
+  .top-icons {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+  }
+
+  .icon-btn {
+      font-size: 20px;
+      cursor: pointer;
+      transition: 0.3s;
+  }
+
+  .icon-btn:hover {
+      color: #00bfff;
+  }
+      .popup-title {
+      color: #3de0d2;
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 25px;
+      text-align: center;
+    }
+
+    .popup-content{
+      align-items: flex-start;
+      max-height:400px;
+      overflow-y:auto;
+      padding-right:10px;
+    }
+
+    .input-group{
+      margin-bottom:15px;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 25px;
+    }
+
+    .input-group label {
+      color: #cfd8dc;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+
+    .input-group input {
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid #3de0d2;
+      background: #0f1c26;
+      color: #ffffff;
+      font-size: 16px;
+      outline: none;
+      transition: 0.2s;
+    }
+    .input-group input:focus {
+      border-color: #00f5d4;
+      box-shadow: 0 0 10px rgba(0,245,212,0.4);
+    }
+    .save-btn {
+      background: linear-gradient(90deg, #00c8ff, #00f5d4);
+      border: none;
+      padding: 12px;
+      border-radius: 12px;
+      width: 100%;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .save-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 255, 212, 0.4);
+    }
+    /* animation */
+    @keyframes popupFade {
+      from {
+        opacity: 0;
+        transform: translateY(-15px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+        /* ============================= */
+/* ICON */
+/* ============================= */
+/* ============================= */
+/* GRAPH CARD */
+/* ============================= */
+
+.graph-card{
+  width:100%;
+  height:220px;
+  padding:12px 14px;
+  border-radius:14px;
+
+  background:#1e2530;
+  box-shadow:0 6px 18px rgba(0,0,0,.35);
+
+  box-sizing:border-box;
+}
+
+.graph-card canvas{
+  width:100%!important;
+  height:100%!important;
+}
+
+/* ============================= */
+/* ALARM ICON */
+/* ============================= */
+
+.alarm-icon{
+  width:26px;
+  height:26px;
+  cursor:pointer;
+  color:#8b9bb4;
+
+  transition:all .25s ease;
+}
+
+.alarm-icon:hover{
+  color:#2dd4bf;
+  transform:scale(1.12);
+}
+
+.alarm-active{
+  color:#ff6b6b;
+  animation:luxPulse 1.6s infinite;
+}
+
+@keyframes luxPulse{
+  0%{opacity:1}
+  50%{opacity:.55}
+  100%{opacity:1}
+}
+
+/* ============================= */
+/* BADGE */
+/* ============================= */
+
+.alarm-badge{
+  position:absolute;
+  top:-5px;
+  right:-7px;
+
+  background:linear-gradient(145deg,#ff6b6b,#991b1b);
+  color:#fff;
+
+  font-size:10px;
+  padding:2px 6px;
+
+  border-radius:20px;
+  font-weight:600;
+
+  box-shadow:0 4px 10px rgba(0,0,0,.45);
+}
+
+/* ============================= */
+/* ALARM PANEL */
+/* ============================= */
+
+.alarm-panel{
+  position:fixed;
+  top:70px;
+  right:26px;
+
+  width:340px;
+  max-height:420px;
+
+  background:linear-gradient(160deg,#0f172a,#1e293b);
+  border-radius:16px;
+
+  box-shadow:
+  0 20px 55px rgba(0,0,0,.65),
+  inset 0 0 0 1px rgba(255,255,255,.05);
+
+  backdrop-filter:blur(8px);
+
+  display:none;
+  flex-direction:column;
+  overflow:hidden;
+
+  z-index:999999;
+}
+
+.alarm-panel.open{
+  display:flex;
+  animation:fadeSlide .22s ease;
+}
+
+@keyframes fadeSlide{
+  from{
+    opacity:0;
+    transform:translateY(-8px);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+/* ============================= */
+/* HEADER */
+/* ============================= */
+
+.alarm-header{
+  padding:16px 18px;
+
+  font-size:14px;
+  font-weight:600;
+  letter-spacing:.3px;
+
+  color:#2dd4bf;
+
+  background:rgba(255,255,255,.02);
+  border-bottom:1px solid rgba(255,255,255,.05);
+}
+
+/* ============================= */
+/* LIST */
+/* ============================= */
+
+.alarm-list{
+  padding:16px 18px;
+  overflow-y:auto;
+  font-size:13px;
+
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.alarm-list::-webkit-scrollbar{
+  width:6px;
+}
+
+.alarm-list::-webkit-scrollbar-thumb{
+  background:#334155;
+  border-radius:10px;
+}
+
+/* ============================= */
+/* CARD */
+/* ============================= */
+
+.alarm-item{
+  background:linear-gradient(145deg,#111827,#1f2937);
+  border-radius:14px;
+  padding:16px 18px;
+  margin-bottom:16px;
+
+  border-left:3px solid #2dd4bf;
+
+  transition:.25s ease;
+}
+
+.alarm-item:hover{
+  transform:translateY(-3px);
+  box-shadow:0 15px 30px rgba(0,0,0,.6);
+}
+
+/* LEVEL COLORS */
+
+.alarm-item.LOW{
+  border-left-color:#facc15;
+}
+
+.alarm-item.HIGH{
+  border-left-color:#fb923c;
+}
+
+.alarm-item.CRITICAL{
+  border-left-color:#ff6b6b;
+  box-shadow:0 0 15px rgba(255,107,107,.35);
+}
+
+/* TITLE */
+
+.alarm-item strong{
+  font-size:14px;
+  font-weight:600;
+  display:block;
+  margin-bottom:8px;
+  color:#ffffff;
+}
+
+/* TIME */
+
+.alarm-time{
+  font-size:11px;
+  color:#94a3b8;
+  margin-bottom:8px;
+}
+
+/* DETAIL */
+
+.alarm-detail{
+  font-size:13px;
+  color:#e2e8f0;
+  line-height:1.6;
+  margin-bottom:8px;
+}
+
+/* ============================= */
+/* BUTTONS */
+/* ============================= */
+
+.alarm-item button{
+  padding:6px 14px;
+  border-radius:10px;
+  border:none;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+  transition:.25s ease;
+}
+
+/* ACK */
+.alarm-item button:first-child{
+  background:linear-gradient(145deg,#2dd4bf,#0d9488);
+  color:white;
+}
+
+.alarm-item button:first-child:hover{
+  transform:scale(1.05);
+}
+
+/* RESET */
+.alarm-item button:last-child{
+  background:linear-gradient(145deg,#ff6b6b,#b91c1c);
+  color:white;
+  margin-left:8px;
+}
+
+button{
+    background:#00c853;
+    border:none;
+    padding:8px 16px;
+    border-radius:8px;
+    color:white;
+    font-weight:600;
+    cursor:pointer;
+    transition:0.2s;
+}
+
+button:hover{
+    background:#00a844;
+}
+.apply-btn{
+    background:#00c853 !important;
+}
+
+.apply-btn:hover{
+    background:#00a844 !important;
+}
+.alarm-item button:last-child:hover{
+  transform:scale(1.05);
+}
+
+        .settings-tabs{
+      display:flex;
+      gap:8px;
+      margin-bottom:20px;
+    }
+
+    .tab-btn{
+      flex:1;
+      padding:8px;
+      border:none;
+      border-radius:8px;
+      background:#252a33;
+      color:white;
+      cursor:pointer;
+    }
+
+    .tab-btn.active{
+      background:#4fd1c5;
+      color:black;
+      font-weight:bold;
+    }
+
+    .tab-content{
+      display:none;
+    }
+
+    .tab-content.active{
+      display:block;
+    }
+
+      .settings-panel{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 3000;
+    }
+
+    .settings-panel.open{
+      display: flex;
+    }
+    .settings-overlay{
+      position: fixed;
+      top:0;
+      left:0;
+      width:100%;
+      height:100%;
+      background: rgba(0,0,0,0.6);
+      display:none;
+      justify-content:center;
+      align-items:center;
+      z-index:999;
+    }
+
+    .settings-box{
+    background:#1c1f26;
+    padding:50px 60px;
+    border-radius:18px;
+    width:480px;
+    color:white;
+  }
+
+  .settings-box h2{
+    margin:0 0 35px 0;
+    font-weight:600;
+    letter-spacing:1px;
+    text-align:center;
+    color:#4fd1c5;
+  }
+    .settings-box h3{
+      margin-top:0;
+      color:#4fd1c5;
+      text-align:center;
+      margin-bottom:25px;
+    }
+
+    .form-group{
+      display:flex;
+      flex-direction:column;
+      margin-bottom:18px;
+    }
+
+    .form-group label{
+      margin-bottom:6px;
+      font-size:14px;
+      opacity:0.8;
+    }
+
+    .form-group select{
+      padding:10px;
+      border-radius:8px;
+      border:none;
+      background:#252a33;
+      color:white;
+    }
+
+    .button-row{
+      display:flex;
+      gap:12px;
+      margin-top:20px;
+    }
+
+    .button-row button{
+      flex:1;
+      padding:12px;
+      border:none;
+      border-radius:8px;
+      font-weight:bold;
+      cursor:pointer;
+    }
+    /* Content Grid */
+  .limit-grid{
+    display:grid;
+    grid-template-columns: 1fr;
+    gap:35px 50px;
+  }
+  
+
+  /* Input style minimal */
+  .limit-group{
+    display:flex;
+    flex-direction:column;
+  }
+
+  .limit-group label{
+    font-size:13px;
+    margin-bottom:8px;
+    opacity:0.7;
+  }
+
+  .limit-group input{
+    background:transparent;
+    border:none;
+    border-bottom:1px solid #444;
+    padding:8px 2px;
+    font-size:16px;
+    color:white;
+    outline:none;
+    transition:0.3s;
+  }
+
+  .limit-group input:focus{
+    border-bottom:1px solid #4fd1c5;
+  }
+
+    /* Footer */
+  .popup-footer{
+    margin-top:50px;
+    display:flex;
+    justify-content:flex-end;
+    gap:20px;
+  }
+  
+    .btn-cancel{
+    background:none;
+    border:none;
+    color:#aaa;
+    cursor:pointer;
+  }
+
+    .btn-save{
+    background:#4fd1c5;
+    border:none;
+    padding:8px 18px;
+    border-radius:6px;
+    font-weight:600;
+    cursor:pointer;
+  }
+
+    .btn-close{
+      background:#ff5f5f;
+      color:white;
+    }
+
+
+       .gauge{
+  position:relative;
+  transition:all 0.35s ease;
+
+  width:clamp(95px, 7.5vw, 125px);
+  height:clamp(95px, 7.5vw, 125px);
+  border-radius:50%;
+
+  /* Deep industrial base */
+  background:linear-gradient(160deg,#1c2430 0%, #0c1420 100%);
+
+  /* Premium ring */
+  border:1.5px solid rgba(79,209,197,0.7);
+
+  /* Glow + Depth */
+  box-shadow:
+    inset 0 6px 12px rgba(255,255,255,0.04),
+    inset 0 -8px 18px rgba(0,0,0,0.7),
+    0 0 12px rgba(79,209,197,0.25),
+    0 10px 25px rgba(0,0,0,0.5);
+
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  margin:auto;
+
+  font-size:clamp(18px, 1.3vw, 24px);
+  font-weight:600;
+  letter-spacing:0.5px;
+  color:#e2e8f0;
+}
+
+     .top-gauge-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:70px;
+    flex-wrap:nowrap;   /* ห้ามตกบรรทัด */
+}
+
+      .gauge-box{
+    text-align:center;
+    flex: 0 0 16.66%;
+    max-width:16.66%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+}
+
+    body{
+margin:0;
+padding:0;
+width:100%;
+height:100vh;
+overflow-x:hidden;
+}
+
+      .login-screen{
+        position:fixed;
+        width:100%;
+        height:100%;
+        background:linear-gradient(135deg,#1c1f26,#252a33);
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        z-index:1000;
+      }
+      .login-box{
+        background:#252a33;
+        padding:40px;
+        border-radius:15px;
+        width:350px;
+        text-align:center;
+        box-shadow:0 20px 40px rgba(0,0,0,0.5);
+        color:white;
+      }
+      .login-box input{
+        width:100%;
+        padding:12px;
+        margin:10px 0;
+        border:none;
+        border-radius:8px;
+        background:#1c1f26;
+        color:white;
+      }
+      html, body{
+  height:100%;
+  margin:0;
+}
+
+.container{
+width:100%;
+max-width:100%;
+margin:auto;
+padding:10px;
+box-sizing:border-box;
+}
+      .login-box button{
+        width:100%;
+        padding:12px;
+        border:none;
+        border-radius:8px;
+        background:#4fd1c5;
+        cursor:pointer;
+      }
+      .error{color:#ff5f5f;margin-top:10px}
+
+      .dashboard-frame{
+        width:100%;        /* ✅ ไม่ใช้ vw */
+        height:100vh;
+          overflow:hidden; 
+        background:#1c1f26;
+        border-radius:20px; 
+        padding:0;
+        box-shadow:0 20px 40px rgba(0,0,0,0.4);
+        color:white;
+        display:flex;
+        flex-direction:column;
+        position: relative;
+      z-index: 1;
+      pointer-events:auto;
+      }
+
+
+
+
+     .topbar{
+display:flex;
+align-items:center;
+justify-content:space-between;
+background:#0b1d3a;
+padding:0 20px;
+height:60px;       /* ความสูงแถบบน */
+overflow:hidden;   /* กันรูปเกิน */
+}
+
+      .machine-selector{
+        margin:10px 0;
+      }
+
+      .machine-btn{
+        padding:6px 15px;
+        border:none;
+        border-radius:6px;
+        margin-right:5px;
+        cursor:pointer;
+        background:#323844;
+        color:white;
+      }
+
+      .machine-btn.active{
+        background:#4fd1c5;
+        color:black;
+      }
+      
+
+      .content{
+  flex:1;
+  display:flex;
+  gap:20px;
+  min-height:0;      /* สำคัญมาก */
+  overflow:hidden;   /* กันล้นแนวตั้ง */
+}
+
+.sidebar{
+  width:120px;
+  background:linear-gradient(180deg,#1f2937,#111827);
+  padding:25px 15px;
+  display:flex;
+  flex-direction:column;
+  border-right:1px solid #2f3642;
+
+  flex-shrink:0;     /* กัน sidebar ถูกบีบ */
+  overflow:auto;     /* ถ้าเมนูยาวให้เลื่อนในตัวเอง */
+}
+/* Section Title */
+.sidebar-title{
+  font-size:12px;
+  letter-spacing:1px;
+  color:#6b7280;
+  margin-bottom:15px;
+  padding-left:12px;
+}
+      /* Menu Item */
+.menu-item{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 14px;
+  border-radius:10px;
+  cursor:pointer;
+  color:#cbd5e1;
+  font-size:14px;
+  transition:all 0.25s ease;
+}
+      .menu-item:hover{
+  background:#323844
+}
+.temp-trend-card{
+  display:flex;
+  flex-direction:column;
+}
+
+.temp-trend-card canvas{
+  flex:1;
+  width:100% !important;
+  height:100% !important;
+}
+      
+.main{
+  height: calc(100vh - 170px);
+  display:grid;
+  grid-template-columns: 1.2fr 2fr;
+  grid-template-rows: auto auto;
+  gap:18px;
+  margin-top:-70px;
+}
+
+      .card{
+        background:#252a33;
+        border-radius:10px;
+        padding:5px;
+        
+      }
+
+      .card h4{
+        color:#4fd1c5;
+        margin-top:0;
+      }
+
+     .gauge-box{
+    text-align:center;
+    flex: 0 0 16.66%;
+    max-width: 16.66%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+}
+
+.card-value{
+  font-size:20px;
+  font-weight:600;
+}
+
+.card-label{
+  font-size:12px;
+  opacity:0.7;
+}
+
+      .status-green{color:#4fd1c5}
+      .status-red{color:#ff5f5f}
+      .status-yellow{ color:#facc15;}
+      .blink{animation:blink 1s infinite;}
+      @keyframes blink{50%{opacity:0.3}}
+
+      .alarm-log{
+        height:110px;
+        max-height:110px;      /* กันยืด */
+        overflow-y:auto;       /* เลื่อนแนวตั้ง */
+        overflow-x:hidden;
+        font-size:12px;
+        background:#1c1f26;
+        padding:10px;
+        border-radius:8px;
+        box-sizing:border-box;
+        word-break:break-word; /* กันข้อความยาวดันกล่อง */
+      }
+
+
+
+
+
+     
+
+/* Value */
+
+
+
+
+/* Bar */
+
+
+/* High current */
+      
+      /* ย้าย Incoming Message ไปแถว 3 คอลัมน์ 2 */
+      .incoming-card{
+        grid-column: 2;
+        grid-row: 3;
+      }
+
+      /* ขยับ Temperature Trend ขึ้นมา */
+     .temp-trend-card{
+  grid-column: 2;
+  grid-row: 2 / span 2;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+.temp-trend-card canvas{
+  flex:1;
+  width:100% !important;
+  height:100% !important;
+}
+    /* ===== FIX GRID LAYOUT ===== */
+
+
+    /* Machine Status */
+    .main > .card:nth-child(2){
+  grid-column: 1;
+  grid-row: 2;
+}
+
+    /* Motor Current */
+  
+
+    /* Incoming */
+    .main > .card:nth-child(4){
+      grid-column: 1;
+      grid-row: 3;
+    }
+
+    /* MQTT */
+    .main > .card:nth-child(5){
+      grid-column: 2;
+      grid-row: 3;
+    }
+
+    /* Trend */
+ .temp-trend-card{
+  grid-column: 2;
+  grid-row: 2 / span 2;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+/* container ของกราฟ */
+.chart-container{
+  position:relative;
+  width:100%;
+  height:300px;
+}
+
+.chart-container canvas{
+  width:100% !important;
+  height:100% !important;
+}
+
+    .alarm-item{
+        border-left:4px solid #ff9f43;
+    }
+
+    .alarm-item.CRITICAL{
+        border-left:4px solid #ff4757;
+    }
+
+    .alarm-item.HIGH{
+        border-left:4px solid #ffa502;
+    }
+    /* ===== Override Alarm Color ===== */
+
+    .alarm-item strong{
+      color:#ffb020 !important;
+    }
+
+
+    /* บังคับสีหัว Alarm ให้ไม่ดำ */
+    .alarm-item{
+      color:#ffffff !important;
+    }
+
+    .alarm-item *{
+      color:inherit;
+    }
+    .setting-icon{  
+      cursor:pointer;  
+      font-size:22px;  
+      margin-left:15px;  
+      color:#4fd1c5;  
+    }
+
+    .setting-icon:hover{  
+      transform:scale(1.1);  
+    }
+    /* ===== Floating Setting Icon (Isolated & Safe) ===== */
+
+    .card{
+      position:relative;
+    }
+
+
+
+
+    .card{
+      position:relative;
+    }
+
+    .mp-floating-setting{
+      position:absolute;
+      top:15px;
+      right:20px;
+      cursor:pointer;
+      font-size:18px;
+      color:#4fd1c5;
+      z-index:5;
+    }
+
+    .mp-floating-setting:hover{
+      transform:scale(1.1);
+    }
+
+
+    .mp-floating-setting svg {
+      transition: all 0.4s ease;
+    }
+
+    .mp-floating-setting:hover .gear {
+      animation: spin 1.5s linear infinite;
+    }
+
+    .mp-floating-setting:hover .wrench {
+      stroke: #00ffff;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); transform-origin: 32px 32px; }
+      to   { transform: rotate(360deg); transform-origin: 32px 32px; }
+    }
+    /* ===== Blank Center Popup ===== */
+
+    /* Overlay */
+  .popup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+  }
+
+  .popup-overlay.active{
+    display:flex;
+  }
+
+    /* กล่องหลัก */
+    .popup-box {
+    background: #1c1f26;   /* เรียบ */
+    width: 480px;
+    padding: 50px 60px;
+    border-radius: 16px;
+    color: #ffffff;
+    animation: popupFade 0.2s ease-out;
+    position:relative;
+  }
+  .popup-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:40px;
+  }
+  .popup-header h3 {
+    font-weight:600;
+    font-size:20px;
+    letter-spacing:1px;
+  }
+
+    .popup-close{
+    position:absolute;
+    top:18px;
+    right:22px;
+    font-size:18px;
+    cursor:pointer;
+    color:#aaa;
+    opacity:0.7;
+  }
+
+    .popup-close:hover{
+    opacity:1;
+    color:#4fd1c5;
+  }
+    .gate-setting{
+      margin-bottom:20px;
+      padding:15px;
+      background:#1e2a38;
+      border-radius:10px;
+    }
+
+    .gate-setting h3{
+      margin-bottom:10px;
+    }
+
+    .gate-setting label{
+      display:block;
+      font-size:13px;
+      margin-top:8px;
+      color:#aaa;
+    }
+
+    .gate-setting input{
+      width:100%;
+      padding:6px;
+      border-radius:6px;
+      border:none;
+      margin-top:3px;
+      background:#2c3e50;
+      color:#fff;
+    }
+
+    
+    /* ===== Mapping Slide Panel (Safe Version) ===== */
+  .mapping-slide-panel {
+    position: fixed;
+    top: 60px;
+    right: -420px;
+    width: 400px;
+    height: calc(100% - 60px);
+    background: #1f2937;
+    color: white;
+    padding: 20px;
+    overflow-y: auto;
+    transition: right 0.3s ease;
+    box-shadow: -2px 0 10px rgba(0,0,0,0.5);
+    z-index: 9999;
+  }
+
+  .mapping-slide-panel.show {
+    right: 0;
+  }
+
+  /* ===== Industrial Mapping Icon ===== */
+  /* ===== Mapping Icon - Theme Match ===== */
+  /* ===== Mapping Icon - Theme Match ===== */
+  /* ===== Mapping Icon same color as Alarm ===== */
+
+  .mapping-icon {
+    font-size: 20px;
+    cursor: pointer;
+    transition: 0.3s;
+    color: #6c7a89;   /* สีเดียวกับ alarm-icon */
+  }
+
+  .mapping-icon:hover {
+    color: #4fd1c5;   /* สี hover เดียวกับ alarm */
+    transform: scale(1.1);
+  }
+  .status-text{
+    display: inline-block;
+    width: 130px;   /* ล็อคความกว้าง */
+    text-align: left;
+  }
+
+.alarm-title{
+    font-size:18px;
+    font-weight:700;
+    color:#ff4d4d;
+    margin-bottom:10px;
+}
+
+.alarm-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:6px 20px;
+    font-size:14px;
+    margin-bottom:10px;
+}
+
+.alarm-grid div:nth-child(odd){
+    color:#aaa;
+}
+
+.alarm-grid div:nth-child(even){
+    font-weight:600;
+    text-align:right;
+}
+
+.alarm-card{
+    background:#1f2430;
+    border-left:5px solid #ff4d4d;
+    border-radius:10px;
+    padding:15px;
+    margin-bottom:15px;
+    box-shadow:0 0 15px rgba(0,0,0,0.4);
+}
+/* ===== ALARM THEME MATCH ===== */
+
+.alarm-pro{
+  padding:30px;
+  width:100%;
+  height:100%;
+  background:#1c1f26;   /* ใช้พื้นเดียวกับ dashboard */
+  color:#e5e7eb;
+}
+
+/* HEADER */
+
+.alarm-header-pro{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:25px;
+}
+
+.alarm-header-pro h2{
+  margin:0;
+  font-size:20px;
+  font-weight:600;
+  color:#00c8ff;   /* สีฟ้าที่คุณใช้ใน theme */
+}
+
+.alarm-desc{
+  font-size:12px;
+  color:#9ca3af;
+}
+
+/* SUMMARY BOX */
+
+.alarm-summary-pro{
+  display:flex;
+  gap:15px;
+}
+
+.summary-box{
+  background:#252a33;  /* การ์ดเดียวกับ panel */
+  padding:14px 20px;
+  border-radius:10px;
+  border:1px solid #2f3642;
+  text-align:center;
+  min-width:110px;
+}
+
+.summary-box span{
+  font-size:18px;
+  font-weight:700;
+  display:block;
+  color:#ff5c5c;
+}
+
+.summary-box.ack span{
+  color:#4ade80;
+}
+
+.summary-box small{
+  font-size:12px;
+  color:#9ca3af;
+}
+
+/* TABLE WRAPPER */
+
+.alarm-table-wrapper-pro{
+  background:#252a33;
+  border-radius:12px;
+  border:1px solid #2f3642;
+  overflow:hidden;
+}
+.alarm-table-wrapper{
+    max-height: 500px;      /* ปรับตามใจ */
+    overflow-y: auto;
+    overflow-x: auto;
+    border-radius: 14px;
+}
+/* TABLE */
+
+.alarm-table-pro{
+  width:100%;
+  border-collapse:collapse;
+}
+
+.alarm-table-pro thead{
+  background:#1a1f28;  /* header shade เดิม */
+}
+
+.alarm-table-pro th{
+  padding:14px;
+  text-align:left;
+  font-size:13px;
+  font-weight:600;
+  color:#9ca3af;
+  border-bottom:1px solid #2f3642;
+}
+
+.alarm-table-pro td{
+  padding:14px;
+  font-size:14px;
+  border-bottom:1px solid #2f3642;
+}
+
+/* subtle blue hover ให้กลมกลืน */
+
+.alarm-table-pro tr:hover{
+  background:rgba(0,200,255,0.05);
+}
+
+/* STATUS BADGE */
+
+.status-badge{
+  padding:5px 12px;
+  border-radius:20px;
+  font-size:12px;
+  font-weight:600;
+}
+
+.status-active{
+  background:rgba(255,92,92,0.15);
+  color:#ff5c5c;
+}
+
+.status-ack{
+  background:rgba(74,222,128,0.15);
+  color:#4ade80;
+}
+.alarm-quick-filter{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-left:20px;
+}
+
+.alarm-quick-filter label{
+  font-size:13px;
+  color:#94a3b8;
+}
+
+.alarm-quick-filter select{
+  background:#1f2937;
+  color:#e2e8f0;
+  border:1px solid #334155;
+  padding:6px 10px;
+  border-radius:6px;
+}
+
+.alarm-quick-filter button{
+  background:#ef4444;
+  border:none;
+  color:white;
+  padding:6px 14px;
+  border-radius:6px;
+  cursor:pointer;
+}
+.user-setting-icon{
+    font-size:18px;
+    margin-right:15px;
+    cursor:pointer;
+    color:#4dd0e1;
+}
+
+.user-setting-icon:hover{
+    color:white;
+}
+
+.main-content-row{
+   display:flex;
+   gap:20px;
+}
+
+.machine-status{
+  flex: 2 !important;
+}
+
+.trend-card{
+  flex: 3 !important;
+}
+      </style>
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+
+
+      </head>
+      <body>
+
+        <div id="mappingSlidePanel" class="mapping-slide-panel">
+    <h3>Mapping Configuration</h3>
+    <div id="mappingPanel"></div>
+
+    <br>
+    <button onclick="saveMapping()">Save</button>
+    <button onclick="closeMappingSlide()">Close</button>
+  </div>
+
+     <div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <h2>LOGIN</h2>
+
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+
+    <button onclick="login()">Login</button>
+
+    <!-- TOKEN (ซ่อนก่อน) -->
+    <input type="password" id="tokenInput" placeholder="Enter Token" style="display:none;">
+    <button id="tokenBtn" onclick="checkToken()" style="display:none;">Verify Token</button>
+
+    <div class="error" id="errorMsg"></div>
+  </div>
+</div>
+
+      <div class="dashboard-frame" id="dashboard">
+
+        <div class="topbar">
+          
+      <div class="app-header">
+    <div class="brand" style="position:relative; display:inline-block; width:150px; height:60px;">
+      
+      <svg viewBox="0 0 260 110"
+          style="position:absolute; top:0; left:0; width:100%; height:100%;">
+        
+        <!-- วงรี -->
+        <ellipse cx="130" cy="55" rx="115" ry="42"
+                fill="none"
+                stroke="#444"
+                stroke-width="2"/>
+        
+      </svg>
+
+      <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; font-family:sans-serif; width:100%;">
+        
+        <div style="color:#ff1e1e; font-size:16px; font-weight:900; letter-spacing:-0.4px; line-height:0.9;">
+          BROADBENT
+        </div>
+        
+        <div style="color:#ff1e1e; font-size:9px; font-weight:800; letter-spacing:0.8px;">
+          THAILAND
+        </div>
+        
+      </div>
+
+    </div>
+  </div>
+<div id="clock"></div>
+
+<button onclick="logout()" 
+style="background:#ff5f5f;border:none;padding:8px 15px;border-radius:8px;color:white;cursor:pointer;">
+Logout
+</button>
+</div>
+       
+
+        <div class="content">
+
+          <div class="sidebar">
+        <div class="menu-item" onclick="showDashboardPage()">Dashboard</div>
+        <div class="menu-item" onclick="showPage('alarmPage')">Alarm</div>
+       <div class="menu-item" style="visibility: hidden;">Settings</div>
+      </div>
+
+      <div id="settingsPage" class="page" style="display:none;">
+</div>
+<div id="alarmPage" class="page alarm-pro">
+
+  <div class="alarm-header-pro">
+    <div>
+      
+      <div class="alarm-quick-filter">
+
+
+
+  
+
+</div>
+      
+     
+    </div>
+
+    <div class="alarm-summary-pro">
+      <div class="summary-box">
+        
+      
+      </div>
+      <div class="summary-box ack">
+       
+        <small></small>
+      </div>
+    </div>
+  </div>
+
+  <div class="alarm-table-wrapper">
+  <table class="alarm-table-pro">
+    <thead>
+  <tr>
+
+<th>Date</th>
+<th>Time</th>
+
+<th>Alarm Name</th>
+    <th>Speed (RPM)</th>
+
+    <th>Motor Current (A)</th>
+    
+
+    <th>Vibration (1G)</th>
+    <th>Temp Upper (°C)</th>
+    <th>Temp Lower (°C)</th>
+
+    <th>Feed Valve (%)</th>
+
+  </tr>
+</thead>
+      <tbody id="alarmTableBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+          <div class="main">
+
+          <div class="card" style="grid-column: span 3;">
+        <h4>Machine Parameters</h4>
+        <div class="mp-floating-setting" onclick="toggleSetting()">
+      <svg viewBox="0 0 64 64" width="26" height="26">
+        
+        <!-- Gear -->
+        <g class="gear">
+          <circle cx="32" cy="32" r="10" fill="none" stroke="#4fd1c5" stroke-width="3"/>
+          <path d="M32 6v8M32 50v8M6 32h8M50 32h8
+                  M14 14l6 6M44 44l6 6
+                  M14 50l6-6M44 20l6-6"
+                stroke="#4fd1c5" stroke-width="3"/>
+        </g>
+
+        <!-- Wrench -->
+        <path class="wrench"
+              d="M42 10a8 8 0 0 0 8 8l-6 6-6-6a8 8 0 0 0 4-8z
+                M28 36l-14 14"
+              fill="none"
+              stroke="#4fd1c5"
+              stroke-width="3"
+              stroke-linecap="round"/>
+
+      </svg>
+    </div>
+
+        <div class="top-gauge-row">
+
+          <div class="gauge-box">
+        <div class="gauge-label">SPEED</div>
+        
+        <div class="gauge" id="speedGauge">-- RPM</div>
+        <div id="speedStatus" style="margin-top:6px;font-size:13px;"></div>
+      </div>
+
+    <div class="gauge-box">
+        <div class="gauge-label">UPPER TEMP</div>
+        <div class="gauge" id="tempUpperGauge">-- °C</div>
+    </div>
+
+          <div class="gauge-box">
+            <div class="gauge-label">LOWER TEMP</div>
+            <div class="gauge" id="tempLowerGauge">-- °C</div>
+          </div>
+
+        
+
+          <div class="gauge-box">
+            <div class="gauge-label">FEED VALVE</div>
+            <div class="gauge" id="feedValveGauge">-- %</div>
+          </div>
+
+          
+
+          <div class="gauge-box">
+            <div class="gauge-label">VIBRATION</div>
+            <div class="gauge" id="vibrationGauge">-- </div>
+          </div>
+<div class="gauge-box">
+    <div class="gauge-title">MOTOR CURRENT</div>
+    <div class="gauge" id="motorCurrentValue">-- A</div>
+</div>
+        </div>
+      </div>
+      
+
+            <div class="card">
+  <h4>MACHINE STATUS</h4>
+
+  <div class="status-panel">
+
+    <div class="status-row">
+      <span class="status-label">MACHINE</span>
+      <span id="machineStatus" class="status-badge stopped">STOPPED</span>
+    </div>
+
+    <div class="status-row">
+      <span class="status-label">ISOLATION VALVE</span>
+      <span id="isoStatus" class="status-badge stopped">CLOSED</span>
+    </div>
+
+    <div class="status-row">
+      <span class="status-label">MACHINE FAULT</span>
+      <span id="faultStatus" class="status-badge normal">NO FAULT</span>
+    </div>
+
+<div id="faultNameBox" class="fault-name-box">
+
+<div class="fault-label">LAST ALARM</div>
+<div id="machineFaultBox" class="fault-box">
+NO FAULT
+</div>
+
+</div>
+
+
+    <div class="status-row">
+      <span class="status-label">FEED VALVE</span>
+      <span id="modeStatus" class="status-badge stopped">CLOSE</span>
+    </div>
+
+    <div class="status-row">
+  <span class="status-label">DCS MODE SELECT</span>
+  <span id="dcsModeStatus" class="status-badge normal">LOCAL</span>
+</div>
+
+  </div>
+</div>
+
+            <div class="card motor-current-card">
+            <div class="current-value">
+  <span id="motorCurrentValue">--</span> A
+</div>
+              <div class="current-bar-container">
+                <div class="current-bar" id="currentBar"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h4>INCOMING MESSAGE</h4>
+              <div class="alarm-log" id="rawMessage">No Data</div>
+            </div>
+
+            <div class="card">
+              <h4>MQTT Status</h4>
+              <p id="mqttStatus" class="status-red">● DISCONNECTED</p>
+              <p style="font-size:12px">Topic: scada/machineX</p>
+              <p style="font-size:12px">Messages: <span id="msgCounter">0</span></p>
+            </div>
+
+            <div class="card temp-trend-card">
+        <h4>
+
+          <span>TREND GRAPH</span>
+      
+<h4 style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:0;">
+
+
+
+<div style="display:flex;align-items:center;gap:12px;">
+
+<span style="color:#63f3e8;font-weight:600;letter-spacing:1px;font-size:13px;">
+SELECT MANIN GRAPH
+</span>
+
+<select id="graphSelector" onchange="toggleGraph(this.value)"
+style="background:#1c1f26;color:white;border:none;padding:6px 10px;border-radius:4px;">
+<option value="temp_upper">Upper Temp</option>
+<option value="temp_lower">Lower Temp</option>
+<option value="speed">Speed</option>
+<option value="current">Motor Current</option>
+<option value="vibration">Vibration</option>
+<option value="feed_valve">Feed Valve</option>
+</select>
+
+
+<button onclick="resetZoom()"
+style="background:#4fd1c5;color:black;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;">
+RESET ZOOM
+</button>
+
+</div>
+
+</h4>
+
+        <canvas id="tempChart"></canvas>
+      </div>
+
+
+
+          </div>
+        </div>
+
+      
+
+      <!-- SETTINGS PANEL -->
+      <div class="settings-overlay" id="settingsPanel">
+      <div class="settings-box">
+
+        <h2 style="margin-bottom:20px;">Gate Settings</h2>
+
+    <div class="gate-setting">
+      <h3>Gate 1</h3>
+      <label>Low Limit</label>
+      <input type="number" id="g1_low">
+      <label>High Limit</label>
+      <input type="number" id="g1_high">
+    </div>
+
+    <div class="gate-setting">
+      <h3>Gate 2</h3>
+      <label>Low Limit</label>
+      <input type="number" id="g2_low">
+      <label>High Limit</label>
+      <input type="number" id="g2_high">
+    </div>
+
+    <div class="gate-setting">
+      <h3>Gate 3</h3>
+      <label>Low Limit</label>
+      <input type="number" id="g3_low">
+      <label>High Limit</label>
+      <input type="number" id="g3_high">
+    </div>
+
+    <button onclick="saveGateSettings()" class="save-btn">Save</button>
+
+      <h3>System Settings</h3>
+
+      <!-- TAB MENU -->
+      <div class="settings-tabs">
+      <button class="tab-btn active" onclick="openTab('comm')">Communication</button>
+      <button class="tab-btn" onclick="openTab('machine')">Machine</button>
+      <button class="tab-btn" onclick="openTab('alarm')">Alarm</button>
+      <button class="tab-btn" onclick="openTab('system')">System</button>
+      <button class="tab-btn" onclick="openTab('user')">User</button>
+      
+    </div>
+
+
+      <!-- TAB CONTENT -->
+
+      <div class="tab-content active" id="comm">
+
+        <div class="form-group">
+          <label>MQTT Server</label>
+          <select id="setServer">
+            <option value="hivemq">HiveMQ Cloud</option>
+            <option value="local">Local Broker</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Machine</label>
+          <select id="setMachine">
+            <option value="1">Machine 1</option>
+            <option value="2">Machine 2</option>
+          </select>
+        </div>
+
+      </div>
+
+      <div class="tab-content" id="machine">
+
+      <div class="form-group">
+        <label>Max RPM</label>
+        <input type="number" id="speedLimit" placeholder="3000">
+      </div>
+
+      <div class="form-group">
+        <label>Max Current (%)</label>
+        <input type="number" placeholder="100">
+      </div>
+
+    </div>
+
+    <div class="tab-content" id="alarm">
+
+      <div class="form-group">
+        <label>Upper Temp MAX (°C)</label>
+        <input type="number" id="setTempUpperMax" value="80">
+      </div>
+
+      <div class="form-group">
+        <label>Upper Temp MIN (°C)</label>
+        <input type="number" id="setTempUpperMin" value="10">
+      </div>
+
+      <div class="form-group">
+        <label>Lower Temp MAX (°C)</label>
+        <input type="number" id="setTempLowerMax" value="80">
+      </div>
+
+      <div class="form-group">
+        <label>Current MAX (%)</label>
+        <input type="number" id="setCurrentMax" value="85">
+      </div>
+
+      <div class="form-group">
+        <label>Vibration MAX (mm/s)</label>
+        <input type="number" id="setVibrationMax" value="70">
+      </div>
+
+    </div>
+
+        <div class="form-group">
+          <label>Theme</label>
+          <select>
+            <option>Dark</option>
+            <option>Light</option>
+          </select>
+        </div>
+
+      </div>
+    <div class="tab-content" id="user">
+
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" value="admin" disabled>
+      </div>
+
+      <div class="form-group">
+        <label>Change Password</label>
+        <input type="password" placeholder="New Password">
+      </div>
+
+      <div class="form-group">
+        <label>Role</label>
+        <select>
+          <option>Administrator</option>
+          <option>Operator</option>
+          <option>Viewer</option>
+        </select>
+      </div>
+
+    </div>
+
+      <div class="button-row">
+        <button class="btn-save" onclick="saveSettings()">Save</button>
+        <button class="btn-close" onclick="closeSettings()">Close</button>
+      </div>
+
+    </div>
+
+
+
+      </div> <!-- ปิด dashboard-frame -->
+
+
+
+</div>
+
+</div>
+      <script>
+
+
+const alarmList = {
+0: "High Vibration Alarm",
+1: "Vibration Sensor Trip",
+2: "Main Motor Current Overload Trip from Inverter",
+3: "Main Motor Winding Thermistor High Temperature",
+4: "Vibration Monitor Fault",
+5: "Current Transformer Monitor Fault",
+6: "Stop Feed Push Button on Operator Panel",
+7: "Emergency Stop Push Button on Operator Panel",
+8: "Centrifuge Upper Bearing High Temperature",
+9: "Centrifuge Lower Bearing High Temperature",
+10: "Centrifuge Upper Bearing Temperature Trip",
+11: "Centrifuge Lower Bearing Temperature Trip",
+12: "Upper Bearing Resistance Temperature Detector Fault",
+13: "Lower Bearing Resistance Temperature Detector Fault",
+14: "Centrifuge Rotation Overspeed Trip",
+15: "Centrifuge Rotation Speed Mismatch",
+16: "Inverter Fault - Check the connection between the LAN PLC and the inverter",
+17: "Run up fault - Check Speed Sensor 1",
+18: "Alarm Belt Tension Check"
+};
+function addLine(line){
+
+if(line === "") return;
+
+if(activeLines.includes(line)) return;
+
+activeLines.push(line);
+
+let colorMap = {
+temp_upper:"#4fd1c5",
+temp_lower:"#ff7b7b",
+speed:"#ffd166",
+current:"#6ab7ff",
+vibration:"#c084fc",
+feed_valve:"#00ffaa"
+};
+
+tempChart.data.datasets.push({
+label: line.replace("_"," ").toUpperCase(),
+data: [],
+borderColor: colorMap[line] || "#ffffff",
+borderWidth:2,
+tension:0.3
+});
+
+tempChart.update();
+
+}
+    
+function getActiveAlarms(word1, word2){
+
+    let active = [];
+
+    // alarmWord1 (bit 0-15)
+    for(let i=0;i<16;i++){
+        if((word1 >> i) & 1){
+            active.push(i);
+        }
+    }
+
+    // alarmWord2 (bit 16-31)
+    for(let i=0;i<16;i++){
+        if((word2 >> i) & 1){
+            active.push(i+16);
+        }
+    }
+
+    return active;
+}
+        
+let faultCounter = parseInt(localStorage.getItem("faultCounter")) || 1;
+  let lastFaultState = 0;
+let lastNormalData = {};
+let faultStartTime = null;
+let lastAlarmBit = 0;
+let faultSnapshot = null;
+
+  async function updateAlarmTable(){
+
+let data;
+
+try{
+
+const query = `
+from(bucket: "Centrifuge")
+|> range(start: --5s)
+|> filter(fn:(r)=> r._measurement == "machine_data")
+|> pivot(rowKey:["_time"], columnKey:["_field"], valueColumn:"_value")
+|> last()
+`;
+
+const res = await fetch(influxUrl,{
+method:"POST",
+headers:{
+"Authorization":"Token "+influxToken,
+"Content-Type":"application/vnd.flux",
+"Accept":"application/csv"
+},
+body:query
+});
+
+const csv = await res.text();
+const rows = csv.split("\n");
+
+if(rows.length < 2) return;
+
+const header = rows[0].split(",");
+const values = rows[1].split(",");
+
+data = {};
+
+header.forEach((h,i)=>{
+data[h] = values[i];
+});
+
+}
+catch(err){
+console.error("InfluxDB read error:",err);
+return;
+}
+
+const faultState = Number(data.Machine_fault);
+const alarmBit = Number(data.alarm_bit);
+
+// =====================
+// fault ใหม่เกิด
+// =====================
+if(faultState === 1 && lastFaultState === 0){
+
+const tableBody = document.getElementById("alarmTableBody");
+if(!tableBody) return;
+
+faultStartTime = Date.now();
+
+const now = new Date();
+
+const year = now.getFullYear()+543;
+const month = String(now.getMonth()+1).padStart(2,"0");
+const day = String(now.getDate()).padStart(2,"0");
+
+const date = `${year}-${month}-${day}`;
+
+const time = now.toLocaleTimeString("th-TH",{
+hour:"2-digit",
+minute:"2-digit",
+second:"2-digit",
+hour12:false
+});
+
+const faultCode = generateFaultCode();
+
+const alarmName = alarmMap[alarmBit] || "UNKNOWN ALARM";
+
+const row = document.createElement("tr");
+
+row.innerHTML = `
+<td>${date}</td>
+<td>${time}</td>
+<td>${faultCode}</td>
+<td>${alarmName}</td>
+<td class="duration">0s</td>
+<td>${data.Machine_at_speed ?? "-"}</td>
+<td>${data.Motor_current ?? "-"}</td>
+<td>${data.Vibration ?? "-"}</td>
+<td>${data.Temperature_upper ?? "-"}</td>
+<td>${data.Temperature_lower ?? "-"}</td>
+<td>${data.Feed_valve_position ?? "-"}</td>
+`;
+
+tableBody.prepend(row);
+
+// =====================
+// Duration Timer
+// =====================
+const durationCell = row.querySelector(".duration");
+
+const timer = setInterval(()=>{
+
+if(lastFaultState === 0){
+clearInterval(timer);
+return;
+}
+
+const sec = Math.floor((Date.now()-faultStartTime)/1000);
+
+if(durationCell){
+durationCell.textContent = sec+"s";
+}
+
+},1000);
+
+// =====================
+// Save History
+// =====================
+try{
+
+let alarms = JSON.parse(localStorage.getItem("alarmHistory")) || [];
+
+const newAlarm = {
+
+timestamp:Date.now(),
+date:date,
+time:time,
+code:faultCode,
+alarmName:alarmName,
+
+Speed:data.Machine_at_speed ?? "-",
+Motor_current:data.Motor_current ?? "-",
+Vibration:data.Vibration ?? "-",
+Temperature_upper:data.Temperature_upper ?? "-",
+Temperature_lower:data.Temperature_lower ?? "-",
+Feed_valve_position:data.Feed_valve_position ?? "-"
+
+};
+
+alarms.unshift(newAlarm);
+
+if(alarms.length>500){
+alarms.pop();
+}
+
+localStorage.setItem("alarmHistory",JSON.stringify(alarms));
+
+}
+catch(e){
+console.error("Alarm save error:",e);
+}
+
+}
+
+// อัปเดตสถานะล่าสุด
+lastFaultState = faultState;
+
+}
+        let gateLimits = {
+      gate1: { low: 0, high: 0 },
+      gate2: { low: 0, high: 0 },
+      gate3: { low: 0, high: 0 }
+    };
+
+  
+    function saveGateSettings(){
+      alert("Mapping Saved ✅");
+
+      gateLimits.gate1.low = Number(document.getElementById("g1_low").value);
+      gateLimits.gate1.high = Number(document.getElementById("g1_high").value);
+
+      gateLimits.gate2.low = Number(document.getElementById("g2_low").value);
+      gateLimits.gate2.high = Number(document.getElementById("g2_high").value);
+
+      gateLimits.gate3.low = Number(document.getElementById("g3_low").value);
+      gateLimits.gate3.high = Number(document.getElementById("g3_high").value);
+
+      alert("Saved Successfully");
+        closeSettings(); 
+    }
+
+    // =========================
+    // ALARM CONFIG
+    // =========================
+
+    const alarmConfig = {
+      temperature: {
+        high: 80,
+        low: 10,
+        messageHigh: "Temperature HIGH",
+        messageLow: "Temperature LOW"
+      },
+      
+    };
+
+    // เก็บสถานะว่า alarm ตัวไหน active อยู่
+    let activeAlarms = {};
+
+      const historyData = {
+    temp_upper: [],
+    temp_lower: [],
+    current: [],
+    vibration: [],
+    speed: []   // 👈 เพิ่มบรรทัดนี้
+};
+      
+      const HISTORY_DURATION = 30 * 60 * 1000; // 30 นาที (ms)
+      let selectedGraph = "temp_upper";
+      let activeLines = ["temp_upper"];   // เส้นที่แสดงบนกราฟ
+      let rangeMinutes = 1; 
+      let tempChart = null;
+      let mqttClient;
+      let messageCount=0;
+      let currentMachine=1;
+      let latestData = 
+      {
+  speed: null,
+  temp_upper: null,
+  temp_lower: null,
+  current: null,
+  vibration: null,
+  feed: null
+};
+
+      /* CLOCK */
+      setInterval(()=>{
+  const now = new Date();
+
+  const date = now.toLocaleDateString("th-TH");
+  const time = now.toLocaleTimeString("th-TH", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+  });
+
+  document.getElementById("clock").innerText = date + " " + time;
+},1000);
+
+      /* LOGIN */
+   /* LOGIN */
+function login(){
+
+  const user = document.getElementById("username").value.trim();
+  const pass = document.getElementById("password").value.trim();
+
+  if(
+      (user === "admin" && pass === "1234") ||
+      (user === "8888888" && pass === "5678")
+  ){
+
+    // บันทึกสถานะ login
+    localStorage.setItem("isLoggedIn","true");
+
+    // ซ่อนหน้า login
+    document.getElementById("loginScreen").style.display="none";
+
+    // แสดง dashboard
+    document.getElementById("dashboard").style.display="flex";
+
+    // เริ่มระบบ
+    startSystem();
+
+  }else{
+
+    document.getElementById("errorMsg").innerText="Invalid username or password";
+
+  }
+
+}
+
+function logout(){
+  localStorage.removeItem("isLoggedIn");
+  location.reload();
+}
+
+// ตรวจ login ตอนเปิดเว็บ
+window.onload = function(){
+
+  if(localStorage.getItem("isLoggedIn") === "true"){
+
+    document.getElementById("loginScreen").style.display="none";
+    document.getElementById("dashboard").style.display="flex";
+
+    startSystem();
+
+  }
+
+};
+
+      const loginScreen = document.getElementById("loginScreen");
+      const dashboard = document.getElementById("dashboard");
+
+      function showDashboard(){
+        loginScreen.style.display="none";
+        dashboard.style.display="flex";
+      }
+
+
+      /* MACHINE SWITCH */
+      function selectMachine(machine){
+
+        currentMachine = machine;
+
+        document.getElementById("btn1").classList.remove("active");
+        document.getElementById("btn2").classList.remove("active");
+        document.getElementById("btn"+machine).classList.add("active");
+
+        messageCount = 0;
+        document.getElementById("msgCounter").innerText = 0;
+        document.getElementById("rawMessage").innerHTML = "No Data";
+
+        
+      
+      }
+      const STORAGE_KEY = "scada_chart_history";
+      function saveChartData(){
+
+  if(!tempChart) return;
+
+  const saveData = tempChart.data.datasets.map(ds=>({
+      key: ds.labelKey,
+      data: ds.data
+  }));
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+
+}
+function loadChartData(){
+
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(!raw) return;
+
+  const saved = JSON.parse(raw);
+
+  saved.forEach(s=>{
+
+    const ds = tempChart.data.datasets.find(d=>d.labelKey === s.key);
+
+    if(ds){
+        ds.data = s.data.map(p=>({
+            x:new Date(p.x),
+            y:p.y
+        }));
+    }
+
+  });
+
+  tempChart.update();
+
+}
+
+function updateRealtime(data){
+
+  const now = Date.now();
+
+  tempChart.data.datasets.forEach(ds=>{
+
+    const key = ds.labelKey;
+
+    if(data[key] !== undefined){
+
+      ds.data.push({
+        x:new Date(),
+        y:Number(data[key])
+      });
+
+      // ลบข้อมูลเก่ากว่า 30 นาที
+      ds.data = ds.data.filter(p =>
+        now - new Date(p.x).getTime() <= HISTORY_DURATION
+      );
+
+    }
+
+  });
+
+  tempChart.update('none');
+  saveChartData();
+}
+  function startSystem(){
+
+Chart.defaults.locale = 'th-TH';
+
+const ctx = document.getElementById('tempChart');
+
+tempChart = new Chart(ctx,{
+type:'line',
+
+data:{
+datasets:[
+
+{
+label:'Upper Temp',
+labelKey:'temp_upper',
+yAxisID:'yTemp',
+data:[],
+borderColor:'#4fd1c5',
+borderWidth:2,
+pointRadius:0,
+tension:0.35,
+parsing:false,
+hidden:false
+},
+
+{
+label:'Lower Temp',
+labelKey:'temp_lower',
+yAxisID:'yTemp',
+data:[],
+borderColor:'#60a5fa',
+borderWidth:2,
+pointRadius:0,
+tension:0.35,
+parsing:false,
+hidden:true
+},
+
+{
+label:'Speed',
+labelKey:'speed',
+yAxisID:'yTemp',
+data:[],
+borderColor:'#facc15',
+borderWidth:2,
+pointRadius:0,
+tension:0.35,
+parsing:false,
+hidden:true
+},
+
+{
+label:'Motor Current',
+labelKey:'current',
+yAxisID:'yTemp',
+data:[],
+borderColor:'#f87171',
+borderWidth:2,
+pointRadius:0,
+tension:0.35,
+parsing:false,
+hidden:true
+},
+
+{
+label:'Vibration',
+labelKey:'vibration',
+yAxisID:'yTemp',
+data:[],
+borderColor:'#a78bfa',
+borderWidth:2,
+pointRadius:0,
+tension:0.35,
+parsing:false,
+hidden:true
+},
+
+{
+label:'Feed Valve',
+labelKey:'feed_valve',
+yAxisID:'yTemp',
+data:[],
+borderColor:'#34d399',
+borderWidth:2,
+pointRadius:0,
+tension:0.35,
+parsing:false,
+hidden:true
+}
+
+]
+},
+
+options:{
+
+responsive:true,
+maintainAspectRatio:false,
+animation:false,
+normalized:true,
+
+interaction:{
+mode:'nearest',
+axis:'x',
+intersect:false
+},
+
+layout:{
+padding:0
+},
+
+scales:{
+
+x:{
+type:'time',
+time:{unit:'minute'},
+grid:{color:'rgba(255,255,255,0.03)'},
+ticks:{
+color:'#6b7280',
+maxTicksLimit:8
+},
+border:{
+display:false
+}
+},
+
+yTemp:{
+position:'left',
+grace:'5%',
+grid:{color:'rgba(255,255,255,0.05)'},
+ticks:{
+color:'#6b7280',
+maxTicksLimit:6
+},
+border:{
+display:false
+}
+}
+
+},
+
+plugins:{
+
+legend:{display:false},
+
+tooltip:{
+backgroundColor:'#111827',
+titleColor:'#fff',
+bodyColor:'#4fd1c5',
+borderColor:'#4fd1c5',
+borderWidth:1,
+padding:10,
+displayColors:false,
+
+callbacks:{
+label:function(context){
+
+const ds = context.dataset;
+const value = context.parsed.y;
+
+const values = ds.data.map(p=>p.y);
+
+const max = Math.max(...values);
+const min = Math.min(...values);
+
+return [
+ds.label + ": " + value,
+"Max: " + max,
+"Min: " + min
+];
+
+}
+}
+
+},
+
+decimation:{
+enabled:true,
+algorithm:'lttb',
+samples:300
+},
+
+zoom:{
+limits:{
+x:{minRange:60000}
+},
+
+pan:{
+enabled:true,
+mode:'x'
+},
+
+zoom:{
+wheel:{enabled:true},
+pinch:{enabled:true},
+drag:{enabled:true},
+mode:'x'
+}
+}
+
+}
+
+}
+
+});
+
+connectMQTT();
+
+} 
+function selectMainGraph(key){
+
+mainLine = key;
+
+tempChart.data.datasets.forEach(ds=>{
+
+if(ds.labelKey === mainLine){
+ds.hidden = false;
+}
+else if(ds.labelKey === secondLine){
+ds.hidden = false;
+}
+else{
+ds.hidden = true;
+}
+
+});
+
+tempChart.update();
+let mainLine = 'temp_upper';
+let secondLine = null;
+}
+function toggleGraph(selected){
+
+  tempChart.data.datasets.forEach(ds => {
+
+    if(ds.labelKey === selected){
+      ds.hidden = false;
+    }else{
+      ds.hidden = true;
+    }
+
+  });
+
+  tempChart.update();
+
+}
+
+
+      /* UPDATE CURRENT */
+    function updateMotorCurrent(value){
+
+    const intValue = Math.round(value ?? 0);   // กัน undefined
+
+    document.getElementById("motorCurrentValue").innerText =
+        intValue;
+
+    let percent = intValue;
+    if(percent > 100) percent = 100;
+    if(percent < 0) percent = 0;
+
+    document.getElementById("currentBar").style.width =
+        percent + "%";
+
+    const bar = document.getElementById("currentBar");
+
+    if(intValue > thresholds.current.max){
+        bar.classList.add("high");
+    }else{
+        bar.classList.remove("high");
+    }
+}
+async function loadInflux(){
+
+try{
+
+const res = await fetch(url);
+const data = await res.json();
+
+console.log(data);
+
+}catch(err){
+console.log(err);
+}
+
+}
+
+setInterval(loadInflux,1000);
+
+async function connectMQTT(){
+
+const mqttStatusEl = document.getElementById("mqttStatus");
+
+  const url = "https://us-east-1-1.aws.cloud2.influxdata.com/api/v2/query?org=My%20Project";
+  const token = "4fNwDg0kIzkeg4MG84DCZ6jcwW7H5z-EmJUu3sKJ4bExW3wHWe-2CLmH-V1tIBze9obloEt-Ufw97UskGuHpmg==";
+
+mqttStatusEl.innerText = "● CONNECTING";
+mqttStatusEl.className = "status-yellow";
+
+async function loadInflux(){
+
+try{
+
+const query = `
+from(bucket:"machine_data")
+ |> range(start:-10s)
+ |> filter(fn:(r)=> r._measurement=="machine_data" or r._measurement=="machine_alarm")
+ |> last()
+`;
+
+const res = await fetch(url,{
+method:"POST",
+headers:{
+"Authorization":"Token "+token,
+"Content-Type":"application/vnd.flux",
+"Accept":"application/csv"
+},
+body:query
+});
+const text = await res.text();
+
+const lines = text.trim().split("\n");
+
+if(lines.length <= 1) return;
+
+const headers = lines[0].split(",");
+const valueIndex = headers.indexOf("_value");
+const fieldIndex = headers.indexOf("_field");
+
+const data = {};
+
+for(let i=1;i<lines.length;i++){
+
+const cols = lines[i].split(",");
+
+const field = cols[fieldIndex];
+const value = cols[valueIndex];
+const alarmList = {
+0: "High Vibration Alarm",
+1: "Vibration Sensor Trip",
+2: "Main Motor Current Overload Trip from Inverter",
+3: "Main Motor Winding Thermistor High Temperature",
+4: "Vibration Monitor Fault",
+5: "Current Transformer Monitor Fault",
+6: "Stop Feed Push Button on Operator Panel",
+7: "Emergency Stop Push Button on Operator Panel",
+8: "Centrifuge Upper Bearing High Temperature",
+9: "Centrifuge Lower Bearing High Temperature",
+10: "Centrifuge Upper Bearing Temperature Trip",
+11: "Centrifuge Lower Bearing Temperature Trip",
+12: "Upper Bearing Resistance Temperature Detector Fault",
+13: "Lower Bearing Resistance Temperature Detector Fault",
+14: "Centrifuge Rotation Overspeed Trip",
+15: "Centrifuge Rotation Speed Mismatch",
+16: "Inverter Fault - Check the connection between the LAN PLC and the inverter",
+17: "Run up fault - Check Speed Sensor 1",
+18: "Alarm Belt Tension Check"
+};
+
+if(!field) continue;
+
+// ถ้าเป็นตัวเลข
+if(!isNaN(value)){
+data[field] = Number(value);
+}
+else{
+data[field] = value;
+}
+
+}
+/* DEBUG */
+document.getElementById("rawMessage").innerText =
+JSON.stringify(data,null,2);
+
+messageCount++;
+document.getElementById("msgCounter").innerText = messageCount;
+
+updateAlarmTable(data);
+
+/* ===== SPEED ===== */
+const faultStatus = document.getElementById("faultStatus");
+if(data.Machine_at_speed !== undefined){
+
+  const speed = Number(data.Machine_at_speed);
+  const statusEl = document.getElementById("machineStatus");
+
+  if(speed > 0){
+      statusEl.innerText = "AT SPEED";
+     statusEl.style.background = "#2f4f54"; // เขียวอมฟ้าเหมือน OPEN
+      statusEl.style.color = "#52e5d7";      // สีตัวอักษรเหมือนตัวอื่น
+  }else{
+      statusEl.innerText = "STOPPED";
+            statusEl.style.background = "#5a2d2d"; // แดงโทนเดียวกับระบบ
+      statusEl.style.color = "#ff6b6b";
+
+  }
+
+}
+if(data.Machine_fault == 1){
+
+faultStatus.innerText = "FAULT";
+faultStatus.classList.remove("normal");
+faultStatus.classList.add("fault");
+
+}else{
+
+faultStatus.innerText = "NO FAULT";
+faultStatus.classList.remove("fault");
+faultStatus.classList.add("normal");
+
+}
+
+if(data.Speed !== undefined){
+
+  const speed = Number(data.Speed);
+  const speedEl = document.getElementById("speedGauge");
+
+  // ===== แสดงค่า Gauge =====
+  if(speedEl){
+    speedEl.innerText = speed + " RPM";
+  }
+
+  // ===== ส่งค่าเข้า Graph =====
+  updateRealtime({
+    speed: speed
+  });
+
+}
+
+const dcsModeStatus = document.getElementById("dcsModeStatus");
+
+if(data.DCS_mode_select == 1){
+
+  dcsModeStatus.innerText = "REMOTE";
+  dcsModeStatus.classList.remove("normal");
+  dcsModeStatus.classList.add("running");
+
+}else{
+
+  dcsModeStatus.innerText = "LOCAL";
+  dcsModeStatus.classList.remove("running");
+  dcsModeStatus.classList.add("normal");
+
+}
+
+const isoStatus = document.getElementById("isoStatus");
+
+if(data.Isolation_valve == 1){
+
+  isoStatus.innerText = "OPEN";
+  isoStatus.classList.remove("stopped");
+  isoStatus.classList.add("running");
+
+}else{
+
+  isoStatus.innerText = "CLOSED";
+  isoStatus.classList.remove("running");
+  isoStatus.classList.add("stopped");
+
+}
+/* ===== TEMP UPPER ===== */
+
+if(data.Temperature_upper !== undefined){
+
+const v = Number(data.Temperature_upper);
+
+document.getElementById("tempUpperGauge").innerText =
+v + " °C";
+
+updateRealtime({
+  temp_upper: v
+});
+
+}
+
+/* ===== TEMP LOWER ===== */
+
+if(data.Temperature_lower !== undefined){
+
+  const v = Number(data.Temperature_lower);
+
+  // ===== แสดงค่า Gauge =====
+  document.getElementById("tempLowerGauge").innerText =
+  v + " °C";
+
+  // ===== ส่งค่าเข้า Graph =====
+  updateRealtime({
+    temp_lower: v
+  });
+
+}
+
+/* ===== MOTOR CURRENT ===== */
+
+if(data.Motor_current !== undefined){
+
+  const current = Number(data.Motor_current);
+
+  // ===== แสดงค่า Gauge =====
+  document.getElementById("motorCurrentValue").innerText =
+  current + " A";
+
+  // ===== ส่งค่าเข้า Graph =====
+  updateRealtime({
+    current: current
+  });
+
+}
+
+const feedValve = document.getElementById("modeStatus");
+
+if(data.Feed_valve_position !== undefined){
+
+  const valvePos = Number(data.Feed_valve_position);
+
+  // ===== แสดงค่า Gauge =====
+  document.getElementById("feedValveGauge").innerText =
+  valvePos + " %";
+
+  // ===== สถานะวาล์ว =====
+  if(data.Speed !== undefined && Number(data.Speed) > 0){
+
+    feedValve.innerText = "OPEN";
+    feedValve.classList.remove("stopped");
+    feedValve.classList.add("running");
+
+  }else{
+
+    feedValve.innerText = "CLOSED";
+    feedValve.classList.remove("running");
+    feedValve.classList.add("stopped");
+
+  }
+
+  // ===== ส่งค่าเข้า Graph =====
+  updateRealtime({
+    feed_valve: valvePos
+  });
+
+}
+let lastAlarmName = "NO FAULT";
+  if(data.alarm_bit !== undefined){
+
+const faultBox = document.getElementById("machineFaultBox");
+if(!faultBox) return;
+
+let bit = Number(data.alarm_bit);
+let alarmName = alarmList[bit] || "UNKNOWN ALARM";
+
+// จำ alarm ล่าสุดจาก Influx
+lastAlarmName = alarmName;
+
+// แสดง alarm
+faultBox.innerText = lastAlarmName;
+
+}
+
+if(data.Machine_fault !== undefined){
+
+const fault = Number(data.Machine_fault);
+const faultBox = document.getElementById("machineFaultBox");
+
+if(fault === 1){
+
+faultBox.style.background = "#2a0f0f";
+faultBox.style.color = "#ff5c5c";
+faultBox.style.border = "2px solid #ff5c5c";
+
+}else{
+
+faultBox.style.background = "#111";
+faultBox.style.color = "#ffaa00";
+faultBox.style.border = "2px solid #ffaa00";
+
+}
+
+}
+
+/* ===== VIBRATION ===== */
+
+if(data.Vibration !== undefined){
+
+  const vib = Number(data.Vibration);
+
+  // ===== แสดงค่า Gauge =====
+  document.getElementById("vibrationGauge").innerText =
+  vib + " %";
+
+  // ===== ส่งค่าเข้า Graph =====
+  updateRealtime({
+    vibration: vib
+  });
+
+}
+
+mqttStatusEl.innerText = "● CONNECTED";
+mqttStatusEl.className = "status-green";
+
+}catch(err){
+
+mqttStatusEl.innerText = "● CONNECTION ERROR";
+mqttStatusEl.className = "status-red";
+
+console.log(err);
+
+}
+
+}
+
+/* เริ่มดึงข้อมูล */
+loadLastAlarm();
+loadInflux();
+
+/* realtime */
+
+setInterval(loadInflux,1000);
+
+}
+
+
+     function generateFaultCode(){
+
+    const code = "F" + String(faultCounter).padStart(3,'0');
+
+    faultCounter++;
+
+    // ⭐ บันทึกค่าล่าสุดไว้
+    localStorage.setItem("faultCounter", faultCounter);
+
+    return code;
+}
+
+
+function updateMachineFault(alarmText){
+
+    const el = document.getElementById("machineFaultStatus");
+
+    if(!el) return;
+
+    if(alarmText){
+
+        el.innerText = alarmText;
+        el.classList.remove("ok");
+        el.classList.add("alarm");
+
+    }else{
+
+        el.innerText = "NO FAULT";
+        el.classList.remove("alarm");
+        el.classList.add("ok");
+
+    }
+
+}
+let chartUpdatePending = false;
+let mqttConnected = false;
+
+      const MAX_POINTS = 1000 // รองรับ ~50 นาที ที่ 1Hz
+
+      function updateChart(type, value){
+
+        if(!window.latestNodeRedData){
+    window.latestNodeRedData = {};
+}
+
+latestNodeRedData[type] = value;
+        const safeValue = Number(value);
+        if (!Number.isFinite(safeValue)) return;   // กันค่า NaN / undefined ทำกราฟหาย
+
+        const now = Date.now();
+
+        historyData[type].push({
+          x: now,
+          y: safeValue
+        });
+
+        // ตัดตามเวลา
+        const cutoff = now - (rangeMinutes * 60 * 1000);
+        while(historyData[type].length &&
+              historyData[type][0].x < cutoff){
+            historyData[type].shift();
+        }
+
+        // ตัดตามจำนวน (กัน RAM บวม)
+        if(historyData[type].length > MAX_POINTS){
+            historyData[type].shift();
+        }
+
+        if(activeLines.includes(type)){
+
+    tempChart.data.datasets.forEach(dataset =>{
+
+        if(dataset.label.toLowerCase().replace(" ","_") === type){
+            dataset.data = historyData[type];
+        }
+
+    });
+
+    tempChart.update('none');
+}
+}
+
+
+      function checkAlarm(temp){
+        if(temp>75){
+          motorStatus.innerText="● STOPPED";
+          motorStatus.className="status-red blink";
+        }else{
+          motorStatus.innerText="● RUNNING";
+          motorStatus.className="status-green";
+        }
+      }
+
+const influxUrl = "https://us-east-1-1.aws.cloud2.influxdata.com/api/v2/query?org=My%20Project";
+const influxToken = "4fNwDg0kIzkeg4MG84DCZ6jcwW7H5z-EmJUu3sKJ4bExW3wHWe-2CLmH-V1tIBze9obloEt-Ufw97UskGuHpmg==";
+
+// ===== LOAD DATA FROM INFLUX =====
+  async function loadAlarmHistory(){
+
+  const tableBody = document.getElementById("alarmTableBody");
+  if(!tableBody) return;
+
+  tableBody.innerHTML="";
+
+  const query = `
+  from(bucket:"machine_data")
+  |> range(start:-30d)
+  |> filter(fn:(r)=> r._measurement == "machine_data" or r._measurement == "machine_alarm")
+  |> filter(fn:(r)=> r._field != "_measurement")
+  |> pivot(rowKey:["_time"], columnKey:["_field"], valueColumn:"_value")
+  |> sort(columns:["_time"], desc:true)
+  |> limit(n:100)
+  `;
+  try{
+
+  const res = await fetch(influxUrl,{
+  method:"POST",
+  headers:{
+  "Authorization":"Token "+influxToken,
+  "Content-Type":"application/vnd.flux",
+  "Accept":"application/csv"
+  },
+  body:query
+  });
+
+  if(!res.ok){
+  console.error("Influx error:",res.status);
+  return;
+  }
+
+  const csv = await res.text();
+
+  const lines = csv.split("\n").filter(l=>l && !l.startsWith("#"));
+  if(lines.length < 2) return;
+
+  const header = lines[0].split(",");
+
+  for(let i=1;i<lines.length;i++){
+
+  const cols = lines[i].split(",");
+  let data={};
+
+  header.forEach((h,j)=>{
+  data[h]=cols[j];
+  });
+
+  if(!data._time) continue;
+
+  const d = new Date(data._time);
+
+  const date =
+  d.getFullYear()+"-"+
+  String(d.getMonth()+1).padStart(2,"0")+"-"+
+  String(d.getDate()).padStart(2,"0");
+
+  const time =
+  String(d.getHours()).padStart(2,"0")+":"+
+  String(d.getMinutes()).padStart(2,"0");
+  const row = document.createElement("tr");
+
+  let bit = Number(data.alarm_bit);
+  let alarmName = alarmList[bit] || "UNKNOWN ALARM";
+
+  row.innerHTML=`
+  <td>${date}</td>
+  <td>${time}</td>
+
+  <td>${alarmName}</td>
+  <td>${data.Speed ?? "-"}</td>
+  <td>${data.Motor_current ?? "-"}</td>
+  <td>${data.Vibration ?? "-"}</td>
+  <td>${data.Temperature_upper ?? "-"}</td>
+  <td>${data.Temperature_lower ?? "-"}</td>
+  <td>${data.Feed_valve_position ?? "-"}</td>
+  `;
+
+  tableBody.appendChild(row);
+
+  }
+
+  }catch(err){
+
+  console.error("Influx load error:",err);
+
+  }
+
+  
+  }
+  loadAlarmHistory();
+ async function checkNewAlarm(){
+
+const query = `
+from(bucket:"machine_data")
+|> range(start:-5m)
+|> filter(fn:(r)=> r._measurement == "machine_alarm")
+|> sort(columns:["_time"], desc:true)
+|> limit(n:1)
+`;
+
+try{
+
+const res = await fetch(influxUrl,{
+method:"POST",
+headers:{
+"Authorization":"Token "+influxToken,
+"Content-Type":"application/vnd.flux",
+"Accept":"application/csv"
+},
+body:query
+});
+
+const csv = await res.text();
+const lines = csv.split("\n").filter(l=>l && !l.startsWith("#"));
+
+if(lines.length < 2) return;
+
+const cols = lines[1].split(",");
+const time = cols[3];   // _time
+
+// ครั้งแรก ให้จำเวลาไว้ก่อน
+if(lastAlarmTime === null){
+    lastAlarmTime = time;
+    return;
+}
+
+// ถ้ามี alarm ใหม่
+if(lastAlarmTime !== time){
+
+    console.log("NEW ALARM");
+
+    loadAlarmHistory();   // โหลดตารางใหม่
+
+    lastAlarmTime = time;
+}
+
+}catch(err){
+console.error(err);
+}
+
+}
+  
+  async function loadLastAlarm(){
+
+const faultBox = document.getElementById("machineFaultBox");
+if(!faultBox) return;
+
+const query = `
+from(bucket:"machine_data")
+|> range(start:-30d)
+|> filter(fn:(r)=> r._measurement == "machine_alarm")
+|> filter(fn:(r)=> r._field == "alarm_bit")
+|> last()
+`;
+
+try{
+
+const res = await fetch(influxUrl,{
+method:"POST",
+headers:{
+"Authorization":"Token "+influxToken,
+"Content-Type":"application/vnd.flux",
+"Accept":"application/csv"
+},
+body:query
+});
+
+const csv = await res.text();
+
+const lines = csv.split("\n").filter(l=>l && !l.startsWith("#"));
+if(lines.length < 2) return;
+
+const header = lines[0].split(",");
+const valueIndex = header.indexOf("_value");
+
+const cols = lines[1].split(",");
+const bit = Number(cols[valueIndex]);
+
+let alarmName = alarmList[bit] || "UNKNOWN ALARM";
+
+lastAlarmName = alarmName;
+
+faultBox.innerText = lastAlarmName;
+
+}catch(err){
+
+console.error("Load last alarm error:",err);
+
+}
+
+}
+
+// ===== PAGE LOAD =====
+window.onload = function(){
+
+if(localStorage.getItem("isLoggedIn")==="true"){
+showDashboard();
+startSystem();
+
+loadAlarmHistory();
+
+// refresh ทุก 5 วินาที
+
+
+}
+
+};
+
+function updatePaginationButtons(totalRows){
+
+    const totalPages = Math.ceil(totalRows / rowsPerPage);
+
+    document.getElementById("prevBtn").disabled = currentPage === 1;
+    document.getElementById("nextBtn").disabled = currentPage === totalPages;
+}
+
+function nextPage(){
+    currentPage++;
+    loadAlarmHistory();
+}
+
+function prevPage(){
+    currentPage--;
+    loadAlarmHistory();
+}
+      function updateValveColor(value){
+
+          const gauge = document.getElementById("feedValveGauge");
+
+          if(!gauge) return;  // กัน error ถ้า element ไม่มี
+
+          if(value > 80){
+              gauge.style.borderColor = "#ff5f5f";
+          }
+          else if(value > 30){
+              gauge.style.borderColor = "#facc15";
+          }
+          else{
+              gauge.style.borderColor = "#4fd1c5";
+          }
+      }
+
+    function updateSpeedStatus(atSpeed){
+
+        const el = document.getElementById("speedStatus");
+        if(!el) return;
+
+        if(atSpeed === 1){
+            el.innerText = "● AT SPEED";
+            el.style.color = "#4fd1c5";
+        }else{
+            el.innerText = "● NOT READY";
+            el.style.color = "#ff5f5f";
+        }
+    }
+    let currentPage = 1;
+const rowsPerPage = 10;
+
+      let selectedGraphs = [];
+
+
+
+
+async function loadHistory30min(){
+
+const url = influxUrl;
+const token = influxToken;
+
+const query = `
+from(bucket:"machine_data")
+|> range(start:-30m)
+|> filter(fn:(r)=> r._measurement == "machine_data")
+|> filter(fn:(r)=> r._field == "temp_upper" or
+                   r._field == "temp_lower" or
+                   r._field == "speed" or
+                   r._field == "current" or
+                   r._field == "vibration")
+|> pivot(rowKey:["_time"], columnKey:["_field"], valueColumn:"_value")
+|> sort(columns:["_time"])
+`;
+
+const res = await fetch(url,{
+method:"POST",
+headers:{
+"Authorization":"Token "+token,
+"Content-Type":"application/vnd.flux",
+"Accept":"application/csv"
+},
+body:query
+});
+
+const csv = await res.text();
+
+const lines = csv.split("\n").filter(l=>l && !l.startsWith("#"));
+if(lines.length < 2) return;
+
+const header = lines[0].split(",");
+
+for(let i=1;i<lines.length;i++){
+
+const cols = lines[i].split(",");
+let row={};
+
+header.forEach((h,j)=>{
+row[h]=cols[j];
+});
+
+const time = new Date(row._time);
+
+// ใส่ข้อมูลเข้า dataset
+tempChart.data.datasets.forEach(ds=>{
+
+const key = ds.labelKey;
+
+if(row[key] !== undefined){
+
+ds.data.push({
+x: time,
+y: Number(row[key])
+});
+
+}
+
+});
+
+}
+
+tempChart.update();
+
+saveChartData();
+
+}
+function updateGraph(){
+
+    let yData = data.map(d => d[selectedGraph]);
+
+    Plotly.newPlot("graph", [{
+        x: data.map(d => d.time),
+        y: yData,
+        mode: "lines",
+        name: selectedGraph
+    }]);
+
+}
+      function changeTimeRange(mins){
+        rangeMinutes = parseInt(mins);
+      }
+
+      function getGraphLabel(type){
+        if(type === "temp_upper") return "Upper Temperature";
+        if(type === "temp_lower") return "Lower Temperature";
+        if(type === "current") return "Motor Current";
+        if(type === "vibration") return "Vibration";
+        if(type === "speed") return "Speed (RPM)";
+        return "Trend";
+      }
+      function resetZoom(){
+        if(tempChart){
+          tempChart.resetZoom();
+        }
+      }
+      function openTab(tabId){
+
+      // ปิดทุก content
+      document.querySelectorAll(".tab-content").forEach(el=>{
+        el.classList.remove("active");
+      });
+
+      // เอา active ออกจากปุ่มทั้งหมด
+      document.querySelectorAll(".tab-btn").forEach(el=>{
+        el.classList.remove("active");
+      });
+
+      // เปิด content ที่เลือก
+      document.getElementById(tabId).classList.add("active");
+
+      // ทำให้ปุ่มที่กดเป็น active
+      document.querySelector(`[onclick="openTab('${tabId}')"]`)
+              .classList.add("active");
+    }
+
+let lastAlarmTime = null;
+
+async function checkNewAlarm(){
+
+const query = `
+from(bucket:"machine_data")
+|> range(start:-5m)
+|> filter(fn:(r)=> r._measurement == "machine_alarm")
+|> sort(columns:["_time"], desc:true)
+|> limit(n:1)
+`;
+
+try{
+
+const res = await fetch(influxUrl,{
+method:"POST",
+headers:{
+"Authorization":"Token "+influxToken,
+"Content-Type":"application/vnd.flux",
+"Accept":"application/csv"
+},
+body:query
+});
+
+const csv = await res.text();
+const lines = csv.split("\n").filter(l=>l && !l.startsWith("#"));
+
+if(lines.length < 2) return;
+
+const cols = lines[1].split(",");
+const time = cols[3];   // _time
+
+// ถ้ามี alarm ใหม่
+if(lastAlarmTime && lastAlarmTime !== time){
+
+console.log("NEW ALARM DETECTED");
+
+// โหลดตารางใหม่
+loadAlarmHistory();
+
+}
+
+lastAlarmTime = time;
+
+}catch(err){
+console.error(err);
+}
+
+}
+
+
+      /* =========================
+        SETTINGS SYSTEM
+      ========================= */
+
+      let customBroker = localStorage.getItem("broker") || 
+      "wss://f59f77e5714644e4a27810bf4e502210.s1.eu.hivemq.cloud:8884/mqtt";
+
+      let customUser = localStorage.getItem("mqttUser") || "chonlachadchannel";
+      let customPass = localStorage.getItem("mqttPass") || "0844249230Zz.";
+      let customTopic = localStorage.getItem("mqttTopic") || "scada/machine1";
+
+      function openSettings(){
+
+        const panel = document.getElementById("settingsPanel");
+        if (panel) panel.classList.add("open");
+
+        document.getElementById("setMachine").value =
+            customTopic.includes("machine2") ? "2" : "1";
+
+        document.getElementById("setServer").value =
+            customBroker.includes("hivemq") ? "hivemq" : "local";
+      }
+
+
+    function saveSettings(){
+
+        // ===== ดึงค่า =====
+        const speedMax = Number(document.getElementById("speedLimit").value);
+        const tempUpperMax = Number(document.getElementById("setTempUpperMax").value);
+        const tempUpperMin = Number(document.getElementById("setTempUpperMin").value);
+        const tempLowerMax = Number(document.getElementById("setTempLowerMax").value);
+        const currentMax = Number(document.getElementById("setCurrentMax").value);
+        const vibrationMax = Number(document.getElementById("setVibrationMax").value);
+
+        // ===== VALIDATION =====
+        if(
+            isNaN(speedMax) || isNaN(tempUpperMax) || isNaN(tempUpperMin) ||
+            isNaN(tempLowerMax) || isNaN(currentMax) || isNaN(vibrationMax)
+        ){
+            alert("Please fill all limit fields.");
+            return;
+        }
+
+        if(
+            speedMax <= 0 ||
+            tempUpperMax <= 0 ||
+            tempLowerMax <= 0 ||
+            currentMax <= 0 ||
+            vibrationMax <= 0
+        ){
+            alert("Limits must be greater than 0.");
+            return;
+        }
+
+        if(tempUpperMin >= tempUpperMax){
+            alert("Upper Temp MIN must be lower than MAX.");
+            return;
+        }
+
+        // ===== SAVE =====
+        thresholds.speed.max = speedMax;
+        thresholds.temp_upper.max = tempUpperMax;
+        thresholds.temp_upper.min = tempUpperMin;
+        thresholds.temp_lower.max = tempLowerMax;
+        thresholds.current.max = currentMax;
+        thresholds.vibration.max = vibrationMax;
+
+        localStorage.setItem("thresholds", JSON.stringify(thresholds));
+
+        alert("Limits Saved Successfully ✅");
+
+        closeSettings();
+    }
+    function closeSettings(){
+        document.getElementById("settingsPanel").classList.remove("open");
+    }
+    function toggleSetting(){
+      const popup = document.getElementById("blankPopup");
+      if(!popup) return;   // กัน error เงียบ
+
+      const isOpen = popup.style.display === "flex";
+
+      popup.style.display = isOpen ? "none" : "flex";
+    }
+
+    /* =========================
+    MAPPING SLIDE SYSTEM
+  ========================= */
+
+  function openMappingSlide(){
+    const panel = document.getElementById("mappingSlidePanel");
+    if(panel) panel.classList.add("show");
+  }
+
+  function closeMappingSlide(){
+    const panel = document.getElementById("mappingSlidePanel");
+    if(panel) panel.classList.remove("show");
+  }
+
+  function saveMapping(){
+    alert("Mapping Saved (Demo)");
+  }
+
+  function showPage(pageId){
+
+  document.querySelector(".main").style.display = "none";
+  document.getElementById(pageId).style.display = "block";
+
+}
+
+function showDashboardPage(){
+
+  document.querySelector(".main").style.display = "grid";
+  document.getElementById("alarmPage").style.display = "none";
+
+
+}
+
+
+
+function applyQuickFilter(){
+
+  const hours = parseInt(
+    document.getElementById("quickRange").value
+  );
+
+  const now = new Date();
+  const from = new Date(now.getTime() - hours * 60 * 60 * 1000);
+
+  const table = document.getElementById("alarmTable");
+  const rows = table.querySelectorAll("tbody tr");
+
+  rows.forEach(row => {
+
+    const dateText = row.cells[0].innerText.trim();
+
+    // แปลง "2026-02-24 14:30:10"
+    const rowDate = new Date(dateText.replace(" ", "T"));
+
+    if(rowDate >= from && rowDate <= now){
+      row.style.display = "";
+    }else{
+      row.style.display = "none";
+    }
+
+  });
+
+}
+
+function saveAlarmToStorage(alarm){
+
+    let alarms = JSON.parse(localStorage.getItem("alarmHistory")) || [];
+
+   alarms.unshift(newAlarm);
+
+    // เก็บแค่ 30 วัน
+    const now = Date.now();
+    alarms = alarms.filter(a => (now - a.timestamp) <= 30*24*60*60*1000);
+
+    localStorage.setItem("alarmHistory", JSON.stringify(alarms));
+}
+
+(function(scope){
+
+scope.$watch('msg', function(msg){
+
+    if(!msg || !msg.payload) return;
+
+    // รับค่าที่มาจาก MQTT
+    let alarmText = msg.payload.alarmType;
+
+    // หา element กล่อง fault
+    const box = document.getElementById("faultNameText");
+
+    if(box){
+        box.innerHTML = alarmText;
+    }
+
+});
+
+})(scope);
+setInterval(updateAlarmTable,2000);
+      </script>
+
+
+    <!-- Alarm Panel -->
+    <div id="alarmPanel" class="alarm-panel">
+      <div class="alarm-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Alarm List</span>
+      <button onclick="resetAllAlarms()" 
+              style="background:#ff4d4d;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;">
+        RESET ALL
+      </button>
+    </div>
+      <div id="alarmList" class="alarm-list">
+      </div>
+    </div>
+    <script>
+const alarmMap = {
+0: "High Vibration Alarm",
+1: "Vibration Sensor Trip",
+2: "Main Motor Current Overload Trip from Inverter",
+3: "Main Motor Winding Thermistor High Temperatube",
+4: "Vibration Monitor Fault",
+5: "Current Transformer Monitor Fault",
+6: "Stop Feed Push Button on Operator Panel",
+7: "Emergency Stop Push Button on Opertor Panel",
+8: "Centrifuge Upper Bearing High Temperature",
+9: "Centrifuge Lower Bearing High Temperature",
+10: "Centrifuge Upper Bearing Temperature Trip",
+11: "Centrifuge Lower Bearing Temperature Trip",
+12: "Upper Bearing Resistance Temperature Detector Fault",
+13: "Lower Bearing Resistance Temperature Detector Fault",
+14: "Centrifuge Rotation Overspeed Trip",
+15: "Centrifuge Rotation Speed Mismatch",
+16: "Inverter Fault - Check the connection between the LAN PLC and the inverter",
+17: "Run up fault - Check Speed Sensor 1",
+18: "Alarm Belt Tension Check"
+};
+      function resetAllAlarms(){
+
+      alarms = [];          // ล้าง alarm ทั้งหมด
+      updateAlarmUI();      // รีเฟรชหน้าจอ
+
+      if(typeof stopAlarmSound === "function"){
+        stopAlarmSound();   // หยุดเสียง ถ้ามี
+      }
+
+      console.log("All alarms cleared");
+    }
+    let thresholds = JSON.parse(localStorage.getItem("thresholds")) || {
+    speed: { max: 100 }
+};
+
+    try {
+        thresholds = JSON.parse(localStorage.getItem("thresholds")) || {};
+    } catch(e) {
+        thresholds = {};
+    }
+
+    thresholds.speed ??= { max: 3000 };
+    thresholds.temp_upper ??= { min: 10, max: 80 };
+    thresholds.temp_lower ??= { min: 10, max: 80 };
+    thresholds.current ??= { min: 0, max: 85 };
+    thresholds.vibration ??= { min: 0, max: 70 };
+    // ===== LOAD SAVED THRESHOLDS =====
+window.addEventListener("DOMContentLoaded", function(){
+
+    const savedThresholds = localStorage.getItem("thresholds");
+
+    if(savedThresholds){
+        thresholds = JSON.parse(savedThresholds);
+    }
+
+    const input = document.getElementById("speedLimit");
+    if(input){
+        input.value = thresholds.speed.max;
+    }
+
+    applySpeedLimitToGauge();
+
+    // ✅ เพิ่มบรรทัดนี้
+    loadAlarmHistory();
+
+});
+    let alarms = [];
+    let alarmHistory = [];
+    let alarmId = 0;
+    let alarmName = alarmMap[data.alarmBit] || "NO FAULT";
+    /* ============================= */
+    /* CONFIG */
+    const AlarmLevel = {
+      LOW: { color: "#f1c40f", sound: false },
+      HIGH: { color: "#e67e22", sound: true },
+      CRITICAL: { color: "#ff4d4d", sound: true }
+    };
+    /* ============================= */
+
+    function toggleAlarmPanel() {
+      document.getElementById("alarmPanel").classList.toggle("open");
+    }
+
+    /* ============================= */
+    /* เพิ่ม Alarm */
+    function addAlarm(message, level = "HIGH", detail = "") {
+
+      // กันซ้ำ
+    
+
+      
+
+      const alarm = {
+        id: alarmId++,
+        message,
+        level,
+        detail,
+        time
+      };
+
+      alarms.push(alarm);
+      alarmHistory.push(alarm);
+
+
+    function playBeep(){
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.value = 800;
+      gain.gain.value = 0.1;
+
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+
+      oscillator.start();
+      setTimeout(()=>{
+        oscillator.stop();
+        ctx.close();
+      },200);
+    }
+    showAlarmPopup(message);   // 👈 เพิ่มบรรทัดนี้
+      updateAlarmUI();
+    }
+    function addAlarm(message, level = "HIGH", detail = "") {
+
+     
+
+      const alarm = {
+        id: alarmId++,
+        message,
+        level,
+        detail,
+        time
+      };
+
+      alarms.push(alarm);
+
+      showAlarmPopup(message);   // 👈 บรรทัดนี้ต้องเพิ่ม
+
+      updateAlarmUI();
+    }
+
+
+    // 🔥 วางตรงนี้เลย (ใต้ addAlarm)
+    function showAlarmPopup(text){
+
+      const popup = document.getElementById("alarmPopup");
+
+      popup.innerText = "⚠ " + text;
+      popup.style.display = "block";
+
+      setTimeout(()=>{
+        popup.style.display = "none";
+      },2000);
+    }
+    /* ============================= */
+    /* ============================= */
+    /* ACK */
+    function acknowledge(id) {
+      const alarm = alarms.find(a => a.id === id);
+      if(!alarm) return;
+
+      alarm.ack = true;   // ทำสถานะว่า acknowledge แล้ว
+      updateAlarmUI();
+    }
+
+    /* ============================= */
+    /* RESET (ลบ Alarm) */
+    function resetAlarm(id){
+      alarms = alarms.filter(a => a.id !== id);
+      updateAlarmUI();
+    }
+
+    /* ============================= */
+    /* UPDATE UI */
+       function updateAlarmUI(){
+
+      const list = document.getElementById("alarmList");
+      const badge = document.getElementById("alarmCount");
+
+      list.innerHTML = "";
+
+      alarms.forEach(alarm => {
+
+        const div = document.createElement("div");
+        div.className = "alarm-item " + alarm.level;
+
+        div.innerHTML = `
+          <strong>${alarm.level} - ${alarm.message}</strong>
+          <div>${alarm.time}</div>
+          ${alarm.detail ? `<small>${alarm.detail}</small>` : ""}
+          <div style="margin-top:6px;">
+            ${!alarm.ack ? 
+              `<button onclick="acknowledge(${alarm.id})">ACK</button>` 
+              : 
+              `<span style="color:#4fd1c5;font-weight:bold;">ACKED</span>`
+            }
+            <button onclick="resetAlarm(${alarm.id})"
+              style="margin-left:8px;background:#ff4d4d;color:white;">
+              RESET
+            </button>
+          </div>
+        `;
+
+        list.appendChild(div);
+      });
+      
+// 👇 วางตรงนี้
+if(list){
+  list.scrollTop = 0;
+}
+}
+      badge.innerText = alarms.length;
+
+      // ทำให้กระดิ่งกระพริบถ้ามี alarm
+      const icon = document.querySelector(".alarm-icon");
+      if(alarms.length > 0){
+        icon.classList.add("alarm-active");
+      }else{
+        icon.classList.remove("alarm-active");
+      }
+    
+
+    // ===== UPDATE TABLE PAGE =====
+const tableBody = document.getElementById("alarmTableBody");
+
+// ===== FAULT SNAPSHOT TABLE =====
+if(data.Machine_fault === 1){
+
+  const now = new Date().toLocaleString();
+
+  const tableBody = document.getElementById("alarmTableBody");
+
+
+  if (fault === 1) {
+
+    // ===== สร้างวันเวลาใหม่ (ไม่ทับตัวแปรอื่น) =====
+    const alarmNow = new Date();
+
+    const alarmYear = alarmNow.getFullYear() + 543;
+    const alarmMonth = String(alarmNow.getMonth() + 1).padStart(2,"0");
+    const alarmDay = String(alarmNow.getDate()).padStart(2,"0");
+
+    const alarmDate = `${alarmYear}-${alarmMonth}-${alarmDay}`;
+
+    const alarmTime = alarmNow.toLocaleTimeString("th-TH", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+    });
+
+    // ===== รวมข้อมูลเป็น object เดียว =====
+    const alarmData = {
+        date: alarmDate,
+        time: alarmTime,
+        code: "F001",
+        description: "Motor Fault",
+        level: "HIGH",
+
+        Speed: currentSpeed,
+        current: motorCurrent,
+        vibration: vibrationValue,
+        tempUpper: tempUpper,
+        tempLower: tempLower,
+        feedValve: feedValveValue,
+        isolation: isolationStatus,
+    };
+
+    /* ไอคอนกระพริบ */
+    function flashIcon() {
+      const icon = document.querySelector(".alarm-icon");
+      icon.classList.add("blink");
+    }
+
+
+    /* เสียงเตือน */
+
+
+    // ใส่บรรทัดนี้เพิ่ม
+    function saveMachineParams(){
+
+        const input = document.getElementById("popupSpeedLimit");
+        if(!input) return;
+
+        const val = Number(input.value);
+
+        if(isNaN(val) || val <= 0){
+            alert("Please enter a valid number > 0");
+            return;
+        }
+
+        // ใช้ thresholds ตัวเดิมในระบบคุณ
+        if(!thresholds.speed){
+            thresholds.speed = {};
+        }
+
+        thresholds.speed.max = val;
+
+        // บันทึกเฉพาะถ้ามี thresholds อยู่แล้ว
+        if(typeof thresholds !== "undefined"){
+            localStorage.setItem(
+                "thresholds",
+                JSON.stringify(thresholds)
+            );
+        }
+
+        applySpeedLimitToGauge();
+    }
+
+
+    function applySpeedLimitToGauge(){
+
+        const gauge = document.getElementById("speedGauge");
+        if(!gauge) return;
+
+        const max = thresholds?.speed?.max || 3000;
+
+        gauge.setAttribute("data-max", max);
+    }
+    // โหลดค่า threshold จาก localStorage
+
+  function openMappingSlide(){
+    document
+      .getElementById("mappingSlidePanel")
+      .classList.add("show");
+  }
+
+  function closeMappingSlide(){
+    document
+      .getElementById("mappingSlidePanel")
+      .classList.remove("show");
+  }
+
+  
+
+    </script>
+    <!-- ===== Blank Popup ===== -->
+    <div id="blankPopup" class="popup-overlay">
+      <div class="popup-box">
+  <span class="popup-close"
+        onclick="document.getElementById('blankPopup').style.display='none'">
+  ✕
+  </span>
+        <h2>Machine Parameter Settings</h2>
+
+        <div class="input-group">
+          <label>Speed Limit (RPM)</label>
+          <input type="number" id="popupSpeedLimit" value="100">
+        </div>
+        <!-- Upper Temperature -->
+  <div class="input-group">
+    <label>Upper Temperature (°C)</label>
+    <input type="number" id="popupUpperTemp" value="200">
+  </div>
+
+  <!-- Lower Temperature -->
+  <div class="input-group">
+    <label>Lower Temperature (°C)</label>
+    <input type="number" id="popupLowerTemp" value="120">
+  </div>
+
+  <!-- Feed Rate -->
+  <div class="input-group">
+    <label>Feed Rate (%)</label>
+    <input type="number" id="popupFeedRate" value="80">
+  </div>
+
+  <!-- Vibration -->
+  <div class="input-group">
+    <label>Vibration Limit (mm/s)</label>
+    <input type="number" id="popupVibration" value="5">
+  </div>
+
+        <button class="save-btn"
+                type="button"
+                onclick="saveMachineParams()">
+            Save Settings
+        </button>
+
+      </div>
+    </div>
+
+        
+      
+
+    <div id="alarmPopup" style="
+    position:fixed;
+    top:20px;
+    right:20px;
+    background:#ff4d4d;
+    color:white;
+    padding:15px 20px;
+    border-radius:10px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.5);
+    display:none;
+    z-index:99999;
+    font-weight:bold;">
+    
+    ALARM
+    </div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    showDashboardPage();
+});
+
+ document.getElementById("clearTableBtn").addEventListener("click", function(){
+
+    const confirmClear = confirm(
+        "Are you sure you want to clear all alarm history?\n\nThis action cannot be undone."
+    );
+
+    if(!confirmClear) return;
+
+    try{
+
+        // ลบข้อมูลออกจาก localStorage จริง ๆ
+        localStorage.removeItem("alarmHistory");
+
+        // ล้างตาราง
+        const tbody = document.querySelector("#alarmTableBody");
+        if(tbody){
+            tbody.innerHTML = "";
+        }
+
+        console.log("Alarm history deleted permanently.");
+
+    }catch(err){
+        console.error("Clear table error:", err);
+    }
+
+});
+</script>
+<script>
+
+const API_URL = "https://script.google.com/macros/s/AKfycbwLwYSEketA9NVZ08UssaxlwsYmzs6fZHc9Era_mmnWtWs_NK7-x7VKDkGelK1RIEqU/exec";
+
+async function loadMachineData(){
+
+    try{
+
+        const res = await fetch(API_URL);
+        const data = await res.json();
+
+        console.log("Data from Google:",data);
+
+        // ถ้า API ส่งเป็น array
+        let row = Array.isArray(data) ? data[0] : data;
+
+        // ===== เอาค่าไปใช้ในหน้าเว็บ =====
+
+        document.getElementById("speedValue").innerText = row.Speed;
+        document.getElementById("motorValue").innerText = row.Motor_current;
+        document.getElementById("vibrationValue").innerText = row.Vibration;
+
+        // ===== ตัวอย่าง logic หน้าเว็บ =====
+
+        if(row.Machine_fault == 1){
+
+            document.getElementById("machineStatus").innerText = "FAULT";
+            document.getElementById("machineStatus").style.color = "red";
+
+        }
+        else{
+
+            document.getElementById("machineStatus").innerText = "RUNNING";
+            document.getElementById("machineStatus").style.color = "green";
+
+        }
+
+    }
+    catch(err){
+
+        console.error("Error:",err);
+
+    }
+
+    async function readJSON(){
+
+  const res = await fetch("/tmp/machine_log.json");
+  const data = await res.json();
+
+  data.forEach(row => {
+
+    for (let key in row) {
+
+      console.log(key + " : " + row[key]);
+
+    }
+
+  });
+
+}
+
+}
+  }
+
+// โหลดครั้งแรก
+loadMachineData();
+
+// อัปเดตทุก 3 วินาที
+setInterval(loadMachineData,3000);
+  }
+
+</script>
+
+
+      </body>
+      
+      </html>
